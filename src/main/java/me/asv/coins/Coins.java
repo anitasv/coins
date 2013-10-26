@@ -5,6 +5,11 @@ import org.apache.commons.math3.fraction.BigFraction;
 import org.apache.commons.math3.fraction.BigFractionField;
 import org.apache.commons.math3.linear.*;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Queue;
+import java.util.Random;
+
 /**
  */
 @Data
@@ -41,6 +46,10 @@ public class Coins {
         // Perhaps it even is :P
         Integer[][] acJumps = buildDfa(seqLen, kmpTable);
 
+        for (int i = 0; i < acJumps.length; i++) {
+            System.out.println(Arrays.asList(acJumps[i]));
+        }
+
         BigFraction frac = new BigFraction(1,  base);
 
         int states = seqLen * modulo;
@@ -53,7 +62,6 @@ public class Coins {
         for (int i = 0; i < seqLen; i++) {
             for (int inModulo = 0; inModulo < modulo; inModulo++) {
                 int state = i * modulo + inModulo;
-
                 for (int j = 0; j < base; j++) {
                     int to = acJumps[i][j];
                     int outModulo = (inModulo * base + j) % modulo;
@@ -61,15 +69,16 @@ public class Coins {
 
                     if (to == seqLen) {
                         if (outModulo == 0) {
-                            BigFraction fracOld = acceptingCriteria.getEntry(state);
-                            acceptingCriteria.setEntry(state, fracOld.add(frac));
+                            BigFraction previousValue = acceptingCriteria.getEntry(state);
+                            acceptingCriteria.setEntry(state, previousValue.add(frac));
                         }
                     } else {
-                        transition.setEntry(outState, state, frac);
+                        BigFraction previousValue = transition.getEntry(outState, state);
+                        transition.setEntry(outState, state, previousValue.add(frac));
                     }
                 }
             }
-        }
+        };
 
         FieldMatrix<BigFraction> identity = MatrixUtils.createFieldIdentityMatrix(
                 BigFractionField.getInstance(), states);
