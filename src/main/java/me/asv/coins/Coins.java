@@ -1,6 +1,8 @@
 package me.asv.coins;
 
 import lombok.Data;
+import org.apache.commons.math3.fraction.BigFraction;
+import org.apache.commons.math3.fraction.BigFractionField;
 import org.apache.commons.math3.linear.*;
 
 import java.util.Arrays;
@@ -16,86 +18,97 @@ public class Coins {
 
     private final int modulo;
 
-    public double getProbability() {
+    public BigFraction getProbability() {
         int seqLen = sequence.length;
         /**
-         * http://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_string_matching_algorithm
-         * Brute force generation, even though it can be done in O(seqLen). Lazy to code
-         * full version, because this is not the expensive operation anyway.
+         * Combination of KMP pattern matching and Aho Corasick Algorithm.
          */
-        Integer[][] jumps = new Integer[seqLen][base];
 
-        for (int i = 0; i < seqLen; i++) {
-            for (int j = 0; j < base; j++) {
-                if (sequence[i] == j) {
-                    // If correct one is found, you may go one step further.
-                    jumps[i][j] = i + 1;
-                    continue;
-                }
-                for (int substrLen = i + 1; substrLen >= 0; substrLen--) {
-                    boolean found = true;
-                    if (substrLen > 0) {
-                        if (sequence[substrLen - 1] == j) {
-                            for (int l = 0; l < substrLen - 1; l++) {
-                                if (sequence[l] != sequence[i + 1 - substrLen + l]) {
-                                    found = false;
-                                    break;
-                                }
-                            }
-                        } else {
-                            found = false;
-                        }
-                        if (found) {
-                            jumps[i][j] = substrLen;
-                            break;
-                        }
-                    } else {
-                        jumps[i][j] = substrLen; // = 0;
-                        break; // last loop anyway
-                    }
-                }
+        // Build KMP Table, O(seqLen)
+        Integer[] kmpTable = new Integer[seqLen];
+        if (seqLen > 0) { kmpTable[0] = - 1; }
+        if (seqLen > 1) { kmpTable[1] = 0; }
+        int cnd = 0;
+        for (int pos = 2; pos < seqLen;) {
+            if (sequence[pos - 1] == sequence[cnd]) {
+                cnd++;
+                kmpTable[pos] = cnd;
+                pos = pos + 1;
+            } else if (cnd > 0) {
+                cnd = kmpTable[cnd];
+            } else {
+                kmpTable[pos] = 0;
+                pos++;
             }
         }
-        double frac = 1.0 / base;
+        System.out.println(Arrays.asList(kmpTable));
+        // Build Aho-Corsaic match for single string. This is not the fastest algorithm out
+        // there, but a simple KMP aided fast construction.
+        // This even though looks like O(seqLen^2 * base), it is almost as fast as O(seqLen * base)
+        // Perhaps it even is :P
+        Integer[][] acJumps = new Integer[seqLen][base];
+
+        for (int pos = 0; pos < seqLen; pos++) {
+            for (int alphabet = 0; alphabet < base; alphabet++) {
+                // m is position of current match.
+                int m = 0;
+                for (; m <= pos;) {
+                    // Position of current character in search string.
+                    int i = pos - m;
+                    if (alphabet == sequence[i]) {
+                        // We found a match.
+                        break;
+                    } else {
+                        // Look for a smaller suffix.
+                        m = pos - kmpTable[i];
+                    }
+                }
+                acJumps[pos][alphabet] = pos + 1 - m;
+            }
+        }
+        BigFraction frac = new BigFraction(1,  base);
 
         int states = seqLen * modulo;
-        Array2DRowRealMatrix transition = new Array2DRowRealMatrix(states, states);
+        FieldMatrix<BigFraction> transition = new Array2DRowFieldMatrix<>(BigFractionField.getInstance(),
+                states, states);
 
-        ArrayRealVector blackHoleTransition = new ArrayRealVector(states);
+        FieldVector<BigFraction> blackHoleTransition = new ArrayFieldVector<>(BigFractionField.getInstance(),
+                states);
 
         for (int i = 0; i < seqLen; i++) {
             for (int inModulo = 0; inModulo < modulo; inModulo++) {
                 int state = i * modulo + inModulo;
 
                 for (int j = 0; j < base; j++) {
-                    int to = jumps[i][j];
+                    int to = acJumps[i][j];
                     int outModulo = (inModulo * base + j) % modulo;
                     int outState = to * modulo + outModulo;
 
                     if (to == seqLen) {
                         if (outModulo == 0) {
-                            blackHoleTransition.addToEntry(state, frac);
+                            BigFraction fracOld = blackHoleTransition.getEntry(state);
+                            blackHoleTransition.setEntry(state, fracOld.add(frac));
                         }
                     } else {
-                      transition.setEntry(outState, state, frac);
+                        transition.setEntry(outState, state, frac);
                     }
                 }
             }
         }
 
-        DiagonalMatrix identity = new DiagonalMatrix(states);
-        for (int i = 0; i < states; i++) {
-            identity.setEntry(i, i, 1.0);
-        }
+        FieldMatrix<BigFraction> identity = MatrixUtils.createFieldIdentityMatrix(
+                BigFractionField.getInstance(), states);
 
-        RealVector initialProbability = new ArrayRealVector(states);
-        initialProbability.setEntry(0, 1.0);
+        FieldMatrix<BigFraction> identityMinusTransition = identity.subtract(transition);
 
-        RealMatrix identityFull = new Array2DRowRealMatrix(identity.getData());
+        FieldMatrix<BigFraction> markovInverse = new FieldLUDecomposition<>(identityMinusTransition)
+                .getSolver().getInverse();
 
-        RealMatrix identityMinusTransition = identityFull.subtract(transition);
-        RealMatrix markovInverse = new LUDecomposition(identityMinusTransition).getSolver().getInverse();
-        RealVector finalVector = markovInverse.operate(initialProbability);
+        FieldVector<BigFraction> initialProbability = new ArrayFieldVector<>(BigFractionField.getInstance(),
+                states);
+        initialProbability.setEntry(0, BigFraction.ONE);
+
+        FieldVector<BigFraction> finalVector = markovInverse.operate(initialProbability);
 
         return finalVector.dotProduct(blackHoleTransition);
     }

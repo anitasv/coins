@@ -1,7 +1,10 @@
 package me.asv.coins;
 
+import org.apache.commons.math3.fraction.BigFraction;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.math.BigInteger;
 
 import static org.junit.Assert.assertEquals;
 
@@ -18,6 +21,11 @@ public class CoinsTest {
 
     @Test
     public void test() {
-        assertEquals(10/17.0, coins.getProbability(), 0.0000001);
+        BigFraction probability = coins.getProbability();
+        System.out.println(probability);
+        // Answer should be 10/17
+        assertEquals(new BigInteger("10", 10), probability.getNumerator());
+        assertEquals(new BigInteger("17", 10), probability.getDenominator());
+
     }
 }
