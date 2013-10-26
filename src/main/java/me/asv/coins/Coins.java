@@ -5,12 +5,32 @@ import org.apache.commons.math3.fraction.BigFraction;
 import org.apache.commons.math3.fraction.BigFractionField;
 import org.apache.commons.math3.linear.*;
 
-import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Queue;
-import java.util.Random;
 
 /**
+ * Problem Statement:
+ *
+ * Use a 'base' sided fair coin to generate a number in base 'base'. Stop when it reaches
+ * a predefined sequence of digits. The question is what is the probability that this is
+ * a multiple of 'modulo'.
+ *
+ * Alternately:
+ *
+ * void runSimulation() {
+ *   num = 0;
+ *   while (!num.endsWith(sequence)) { // endsWith in that base.
+ *     toss = fairToss(base);
+ *     num = num * base + toss;  // num = (num concat toss);
+ *   }
+ *
+ *   if (toss % modulo == 0) {
+ *       print YES
+ *   } else {
+ *       print NO
+ *   }
+ * }
+ * What is the probability YES is printed?
+ *
  */
 @Data
 public class Coins {
@@ -46,18 +66,43 @@ public class Coins {
         // Perhaps it even is :P
         Integer[][] acJumps = buildDfa(seqLen, kmpTable);
 
-        for (int i = 0; i < acJumps.length; i++) {
-            System.out.println(Arrays.asList(acJumps[i]));
-        }
-
-        BigFraction frac = new BigFraction(1,  base);
-
         int states = seqLen * modulo;
         FieldMatrix<BigFraction> transition = new Array2DRowFieldMatrix<>(BigFractionField.getInstance(),
                 states, states);
 
         FieldVector<BigFraction> acceptingCriteria = new ArrayFieldVector<>(BigFractionField.getInstance(),
                 states);
+
+        // Building transition matrix and accepting criteria together. This is done in
+        // O(seqLen * modulo * base) time.
+        buildTransitionAndAcceptingCriteria(acJumps, transition, acceptingCriteria);
+
+        FieldMatrix<BigFraction> identity = MatrixUtils.createFieldIdentityMatrix(
+                BigFractionField.getInstance(), states);
+
+        FieldMatrix<BigFraction> identityMinusTransition = identity.subtract(transition);
+
+        // The most awesome step, and most time consuming of all too. This computes the cumulative
+        // transition probability matrix, using an equation I discovered.
+        // Takes O((seqLen * modulo)^3) time.
+        FieldMatrix<BigFraction> markovInverse = new FieldLUDecomposition<>(identityMinusTransition)
+                .getSolver().getInverse();
+
+        FieldVector<BigFraction> initialProbability = new ArrayFieldVector<>(BigFractionField.getInstance(),
+                states);
+        initialProbability.setEntry(0, BigFraction.ONE);
+
+        FieldVector<BigFraction> totalProbability = markovInverse.operate(initialProbability);
+
+        return totalProbability.dotProduct(acceptingCriteria);
+    }
+
+    private void buildTransitionAndAcceptingCriteria(Integer[][] acJumps,
+                                                     FieldMatrix<BigFraction> transition,
+                                                     FieldVector<BigFraction> acceptingCriteria) {
+        // Building transition matrix and accepting criteria together.
+        BigFraction frac = new BigFraction(1,  base);
+        int seqLen = sequence.length;
 
         for (int i = 0; i < seqLen; i++) {
             for (int inModulo = 0; inModulo < modulo; inModulo++) {
@@ -78,23 +123,8 @@ public class Coins {
                     }
                 }
             }
-        };
-
-        FieldMatrix<BigFraction> identity = MatrixUtils.createFieldIdentityMatrix(
-                BigFractionField.getInstance(), states);
-
-        FieldMatrix<BigFraction> identityMinusTransition = identity.subtract(transition);
-
-        FieldMatrix<BigFraction> markovInverse = new FieldLUDecomposition<>(identityMinusTransition)
-                .getSolver().getInverse();
-
-        FieldVector<BigFraction> initialProbability = new ArrayFieldVector<>(BigFractionField.getInstance(),
-                states);
-        initialProbability.setEntry(0, BigFraction.ONE);
-
-        FieldVector<BigFraction> totalProbability = markovInverse.operate(initialProbability);
-
-        return totalProbability.dotProduct(acceptingCriteria);
+        }
+        ;
     }
 
     private Integer[][] buildDfa(int seqLen, Integer[] kmpTable) {

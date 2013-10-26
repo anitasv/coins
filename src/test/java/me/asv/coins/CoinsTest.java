@@ -33,7 +33,7 @@ public class CoinsTest {
         // The brute force simulation algorithm, cross checking the result.
         double fromSimulation = getProbabilityBySimulation(coins);
 
-        assertEquals(asDouble, fromSimulation, 0.0001);
+        assertEquals(asDouble, fromSimulation, 0.001);
     }
 
     private double getProbabilityBySimulation(Coins coins) {
