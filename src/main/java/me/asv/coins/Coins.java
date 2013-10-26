@@ -5,8 +5,6 @@ import org.apache.commons.math3.fraction.BigFraction;
 import org.apache.commons.math3.fraction.BigFractionField;
 import org.apache.commons.math3.linear.*;
 
-import java.util.Arrays;
-
 /**
  */
 @Data
@@ -21,58 +19,35 @@ public class Coins {
     public BigFraction getProbability() {
         int seqLen = sequence.length;
         /**
-         * Combination of KMP pattern matching and Aho Corasick Algorithm.
+         * Steps involved:
+         *   a. Build KMP Table for input string.
+         *   b. Build Aho Corsaic like DFA for input string using KMP.
+         *   c. Build transition matrix from DFA.
+         *   d. Compute Accepting Criteria vector, in this case modulo = 0.
+         *   e. Build initial probability vector.
+         * Note: totalProbability = pI + pT + pT^2 .. = p * I / (I-T)
+         *   g. Compute (I-T) inverse.
+         *   h. Compute totalProbability.
+         *   i. Dot-Product to find probability when modulo = 0.
+         *   j. RETURN
          */
 
         // Build KMP Table, O(seqLen)
-        Integer[] kmpTable = new Integer[seqLen];
-        if (seqLen > 0) { kmpTable[0] = - 1; }
-        if (seqLen > 1) { kmpTable[1] = 0; }
-        int cnd = 0;
-        for (int pos = 2; pos < seqLen;) {
-            if (sequence[pos - 1] == sequence[cnd]) {
-                cnd++;
-                kmpTable[pos] = cnd;
-                pos = pos + 1;
-            } else if (cnd > 0) {
-                cnd = kmpTable[cnd];
-            } else {
-                kmpTable[pos] = 0;
-                pos++;
-            }
-        }
-        System.out.println(Arrays.asList(kmpTable));
+        Integer[] kmpTable = buildKmpTable(seqLen);
+
         // Build Aho-Corsaic match for single string. This is not the fastest algorithm out
         // there, but a simple KMP aided fast construction.
         // This even though looks like O(seqLen^2 * base), it is almost as fast as O(seqLen * base)
         // Perhaps it even is :P
-        Integer[][] acJumps = new Integer[seqLen][base];
+        Integer[][] acJumps = buildDfa(seqLen, kmpTable);
 
-        for (int pos = 0; pos < seqLen; pos++) {
-            for (int alphabet = 0; alphabet < base; alphabet++) {
-                // m is position of current match.
-                int m = 0;
-                for (; m <= pos;) {
-                    // Position of current character in search string.
-                    int i = pos - m;
-                    if (alphabet == sequence[i]) {
-                        // We found a match.
-                        break;
-                    } else {
-                        // Look for a smaller suffix.
-                        m = pos - kmpTable[i];
-                    }
-                }
-                acJumps[pos][alphabet] = pos + 1 - m;
-            }
-        }
         BigFraction frac = new BigFraction(1,  base);
 
         int states = seqLen * modulo;
         FieldMatrix<BigFraction> transition = new Array2DRowFieldMatrix<>(BigFractionField.getInstance(),
                 states, states);
 
-        FieldVector<BigFraction> blackHoleTransition = new ArrayFieldVector<>(BigFractionField.getInstance(),
+        FieldVector<BigFraction> acceptingCriteria = new ArrayFieldVector<>(BigFractionField.getInstance(),
                 states);
 
         for (int i = 0; i < seqLen; i++) {
@@ -86,8 +61,8 @@ public class Coins {
 
                     if (to == seqLen) {
                         if (outModulo == 0) {
-                            BigFraction fracOld = blackHoleTransition.getEntry(state);
-                            blackHoleTransition.setEntry(state, fracOld.add(frac));
+                            BigFraction fracOld = acceptingCriteria.getEntry(state);
+                            acceptingCriteria.setEntry(state, fracOld.add(frac));
                         }
                     } else {
                         transition.setEntry(outState, state, frac);
@@ -108,8 +83,52 @@ public class Coins {
                 states);
         initialProbability.setEntry(0, BigFraction.ONE);
 
-        FieldVector<BigFraction> finalVector = markovInverse.operate(initialProbability);
+        FieldVector<BigFraction> totalProbability = markovInverse.operate(initialProbability);
 
-        return finalVector.dotProduct(blackHoleTransition);
+        return totalProbability.dotProduct(acceptingCriteria);
+    }
+
+    private Integer[][] buildDfa(int seqLen, Integer[] kmpTable) {
+        Integer[][] acJumps = new Integer[seqLen][base];
+
+        for (int pos = 0; pos < seqLen; pos++) {
+            for (int alphabet = 0; alphabet < base; alphabet++) {
+                // m is position of current match.
+                int m = 0;
+                for (; m <= pos;) {
+                    // Position of current character in search string.
+                    int i = pos - m;
+                    if (alphabet == sequence[i]) {
+                        // We found a match.
+                        break;
+                    } else {
+                        // Look for a smaller suffix.
+                        m = pos - kmpTable[i];
+                    }
+                }
+                acJumps[pos][alphabet] = pos + 1 - m;
+            }
+        }
+        return acJumps;
+    }
+
+    private Integer[] buildKmpTable(int seqLen) {
+        Integer[] kmpTable = new Integer[seqLen];
+        if (seqLen > 0) { kmpTable[0] = - 1; }
+        if (seqLen > 1) { kmpTable[1] = 0; }
+        int cnd = 0;
+        for (int pos = 2; pos < seqLen;) {
+            if (sequence[pos - 1] == sequence[cnd]) {
+                cnd++;
+                kmpTable[pos] = cnd;
+                pos = pos + 1;
+            } else if (cnd > 0) {
+                cnd = kmpTable[cnd];
+            } else {
+                kmpTable[pos] = 0;
+                pos++;
+            }
+        }
+        return kmpTable;
     }
 }
