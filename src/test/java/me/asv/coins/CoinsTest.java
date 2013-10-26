@@ -58,7 +58,7 @@ public class CoinsTest {
 
             int nextDigitPos = 0;
 
-            // Use suffix like a
+            // Use suffix like a cyclic array queue.
             while (true) {
                 boolean found = true;
                 for (int j = 0; j < sequence.length; j++) {
