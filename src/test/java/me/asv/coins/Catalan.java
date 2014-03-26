@@ -23,7 +23,11 @@ public class Catalan {
         }
         int n = Integer.valueOf(args[0]);
 
-        for (String seq : getSequences(n)) {
+        // O(n^3)
+        Iterable<String> result = getSequences(n);
+
+        // O(Catalan(n))
+        for (String seq : result) {
             System.out.println("Seq: " + seq);
         }
     }
@@ -32,8 +36,6 @@ public class Catalan {
         if (n == 0) {
             return SINGLETON;
         }
-        // This optimization doesn't save much, because iteration over the result
-        // will still take exponential amount of time.
         if (cache.containsKey(n)) {
             return cache.get(n);
         }
