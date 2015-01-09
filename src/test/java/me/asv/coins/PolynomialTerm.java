@@ -2,6 +2,7 @@ package me.asv.coins;
 
 import org.apache.commons.math3.fraction.BigFraction;
 
+import java.math.BigInteger;
 import java.util.*;
 
 public class PolynomialTerm {
@@ -120,6 +121,23 @@ public class PolynomialTerm {
             }
         }
         return output;
+    }
+
+    public BigFraction accumulate2(List<Integer> alphas) {
+        if (compressed.containsKey(0)) {
+            Integer e = compressed.get(0);
+
+            BigInteger prod = BigInteger.ONE;
+            for (Integer a : alphas) {
+                BigInteger comb = Combinations.nCr(e + a - 1, a);
+                prod = prod.multiply(comb);
+            }
+            prod = prod.subtract(BigInteger.ONE);
+
+            return coeff.multiply(prod);
+        } else {
+            return BigFraction.ZERO;
+        }
     }
 
     public boolean isZero() {

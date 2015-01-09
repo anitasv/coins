@@ -103,10 +103,17 @@ public class Polynomial {
         return builder.toString();
     }
 
-    public BigFraction accumulate( List<Integer> alphas) {
+    public BigFraction accumulate(List<Integer> alphas) {
         BigFraction sum = BigFraction.ZERO;
         for (PolynomialTerm term : terms) {
             sum = sum.add(term.accumulate(alphas));
+        }
+        return sum;
+    }
+    public BigFraction accumulate2(List<Integer> alphas) {
+        BigFraction sum = BigFraction.ZERO;
+        for (PolynomialTerm term : terms) {
+            sum = sum.add(term.accumulate2(alphas));
         }
         return sum;
     }
