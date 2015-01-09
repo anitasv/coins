@@ -2,7 +2,6 @@ package me.asv.coins;
 
 import org.apache.commons.math3.fraction.BigFraction;
 
-import java.math.BigInteger;
 import java.util.*;
 
 public class PolynomialTerm {

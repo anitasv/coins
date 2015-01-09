@@ -2,7 +2,7 @@ package me.asv.coins;
 
 import org.apache.commons.math3.fraction.BigFraction;
 
-import java.lang.Integer;import java.lang.String;import java.lang.System;import java.math.BigInteger;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
