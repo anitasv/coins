@@ -82,17 +82,17 @@ public class Coins {
 
         FieldMatrix<BigFraction> identityMinusTransition = identity.subtract(transition);
 
-        // The most awesome step, and most time consuming of all too. This computes the cumulative
-        // transition probability matrix, using an equation I discovered.
-        // Takes O((seqLen * modulo)^3) time.
-        FieldMatrix<BigFraction> markovInverse = new FieldLUDecomposition<>(identityMinusTransition)
-                .getSolver().getInverse();
+        FieldDecompositionSolver<BigFraction> markovInverse = new FieldLUDecomposition<>(identityMinusTransition)
+                .getSolver();
 
         FieldVector<BigFraction> initialProbability = new ArrayFieldVector<>(BigFractionField.getInstance(),
                 states);
         initialProbability.setEntry(0, BigFraction.ONE);
 
-        FieldVector<BigFraction> totalProbability = markovInverse.operate(initialProbability);
+        // The most awesome step, and most time consuming of all too. This computes the cumulative
+        // transition probability matrix, using an equation I discovered.
+        // Takes O((seqLen * modulo)^2) time.
+        FieldVector<BigFraction> totalProbability = markovInverse.solve(initialProbability);
 
         return totalProbability.dotProduct(acceptingCriteria);
     }
